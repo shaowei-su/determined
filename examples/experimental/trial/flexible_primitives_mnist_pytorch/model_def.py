@@ -77,17 +77,17 @@ class GANTrial(PyTorchTrial):
         self.data_downloaded = False
 
         mnist_shape = (1, 28, 28)
-        self.generator =  self.context._Model(Generator(latent_dim=self.context.get_hparam("latent_dim"), img_shape=mnist_shape))
-        self.discriminator =  self.context._Model(Discriminator(img_shape=mnist_shape))
+        self.generator =  self.context.Model(Generator(latent_dim=self.context.get_hparam("latent_dim"), img_shape=mnist_shape))
+        self.discriminator =  self.context.Model(Discriminator(img_shape=mnist_shape))
 
         lr = self.context.get_hparam("lr")
         b1 = self.context.get_hparam("b1")
         b2 = self.context.get_hparam("b2")
 
-        self.opt_g = self.context._Optimizer(torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2)))
-        self.opt_d = self.context._Optimizer(torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2)))
+        self.opt_g = self.context.Optimizer(torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2)))
+        self.opt_d = self.context.Optimizer(torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2)))
 
-        self.lr_g = self.context._LRScheduler(
+        self.lr_g = self.context.LRScheduler(
             lr_scheduler=LambdaLR(self.opt_g, lr_lambda=lambda epoch: 0.95 ** epoch),
             step_mode=LRScheduler.StepMode.STEP_EVERY_EPOCH,
         )
@@ -124,7 +124,7 @@ class GANTrial(PyTorchTrial):
 
         # sample noise and match gpu device (or keep as cpu)
         z = torch.randn(imgs.shape[0], self.context.get_hparam("latent_dim"))
-        z = self.context._to_device(z)
+        z = self.context.to_device(z)
 
         # generate images and log sampled images to Tensorboard
         generated_imgs = self.generator(z)
@@ -135,11 +135,11 @@ class GANTrial(PyTorchTrial):
 
         # train generator
         valid = torch.ones(imgs.size(0), 1)
-        valid = self.context._to_device(valid)
+        valid = self.context.to_device(valid)
         g_loss = F.binary_cross_entropy(self.discriminator(generated_imgs), valid)
 
-        self.context._backward(g_loss)
-        self.context._step_optimizer(self.opt_g)
+        self.context.backward(g_loss)
+        self.context.step_optimizer(self.opt_g)
 
 
         # train discriminator
@@ -147,16 +147,16 @@ class GANTrial(PyTorchTrial):
         self.discriminator.requires_grad_(True)
 
         valid = torch.ones(imgs.size(0), 1)
-        valid = self.context._to_device(valid)
+        valid = self.context.to_device(valid)
         real_loss = F.binary_cross_entropy(self.discriminator(imgs), valid)
 
         fake = torch.zeros(generated_imgs.size(0), 1)
-        fake = self.context._to_device(fake)
+        fake = self.context.to_device(fake)
         fake_loss = F.binary_cross_entropy(self.discriminator(generated_imgs.detach()), fake)
 
         d_loss = (real_loss + fake_loss) / 2
-        self.context._backward(d_loss)
-        self.context._step_optimizer(self.opt_d)
+        self.context.backward(d_loss)
+        self.context.step_optimizer(self.opt_d)
 
         return {
             'loss': d_loss,
@@ -167,6 +167,6 @@ class GANTrial(PyTorchTrial):
     def evaluate_batch(self, batch: TorchData, model: nn.Module) -> Dict[str, Any]:
         imgs, _ = batch
         valid = torch.ones(imgs.size(0), 1)
-        valid = self.context._to_device(valid)
+        valid = self.context.to_device(valid)
         loss = F.binary_cross_entropy(self.discriminator(imgs), valid)
         return {"loss": loss}
